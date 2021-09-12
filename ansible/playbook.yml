@@ -42,4 +42,6 @@
       file:
         path: /usr/local/bin/kubectl
         mode: 0755
-        #    - name: Configure EFS share
+
+    - name: Configure working directory
+

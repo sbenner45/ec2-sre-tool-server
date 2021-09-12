@@ -1,47 +1,72 @@
 ---
 - hosts: localhost
   become: True
+  vars:
+    cots_s3_bucket: bluewire-sre-cots
+    sre_cots:
+      - terraform
+      - kubectl
+      - packer
+      - awscli
+    sre_rpms:
+      - git
+      - vim
+      - curl
+      - mlocate
+      - wget
+      - zip
+      - tree
+
   tasks:
     - name: Install yum packages
       yum:
-        name:
-          - git
-          - vim
-          - curl
-          - mlocate
-          - wget 
-          - zip
-          - tree
+        name: '{{ sre_rpms }}'
         state: latest
 
-    - name: Download awscli
-      get_url:
-        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
-        dest: /tmp/
+    - name: create tmp cots directory
+      file:
+        path: /tmp/sre-cots
+        state: directory
+
+    - name: Download cots
+      command: '/usr/local/bin/aws s3 sync s3://{{ cots_s3_bucket }}/ /tmp/sre-cots'
+
+    - name: Get cots list
+      find:
+        paths: /tmp/sre-cots
+        patterns: '*'
+      register: sre_cots_list
+
+    - debug:
+        msg: '{{ item.path }}'
+      with_items: '{{ sre_cots_list.files }}'
 
     - name: unarchive awscli
       unarchive:
-        src: /tmp/awscli-exe-linux-x86_64.zip
-        dest: /tmp
+        src: '{{ item.path }}'
+        dest: /tmp/sre-cots
+      when: '"awscli" in item.path'
+      with_items: '{{ sre_cots_list.files }}'
 
     - name: Install awscli
-      command: /tmp/aws/install --update
+      command: /tmp/sre-cots/aws/install --update
 
-    - name: Download Terraform
-      command: /usr/local/bin/aws s3 cp s3://bluewire-sre-cots/terraform_1.0.6_linux_amd64.zip /tmp/
-
-    - name: Install Terraform
+    - name: Install Terraform and packer
       unarchive:
-        src: /tmp/terraform_1.0.6_linux_amd64.zip
+        src: '{{ item.path }}' 
         dest: /usr/local/bin
+      when: '"terraform" in item.path or "packer" in item.path'
+      with_items: '{{ sre_cots_list.files }}'
 
-    - name: Download/install kubectl
-      command: /usr/local/bin/aws s3 cp s3://bluewire-sre-cots/kubectl /usr/local/bin/
-
-    - name: enable kubectl
-      file:
-        path: /usr/local/bin/kubectl
+    - name: install kubectl
+      copy:
+        src: '{{ item.path}}'
+        dest: /usr/local/bin
         mode: 0755
+      when: '"kubectl" in item.path'
+      with_items: '{{ sre_cots_list.files }}'
 
-    - name: Configure working directory
-
+    - name: clean up
+      file:
+        path: /tmp/sre-cots
+        state: absent

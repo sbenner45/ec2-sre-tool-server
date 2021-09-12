@@ -1,0 +1,45 @@
+---
+- hosts: localhost
+  become: True
+  tasks:
+    - name: Install yum packages
+      yum:
+        name:
+          - git
+          - vim
+          - curl
+          - mlocate
+          - wget 
+          - zip
+          - tree
+        state: latest
+
+    - name: Download awscli
+      get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /tmp/
+
+    - name: unarchive awscli
+      unarchive:
+        src: /tmp/awscli-exe-linux-x86_64.zip
+        dest: /tmp
+
+    - name: Install awscli
+      command: /tmp/aws/install --update
+
+    - name: Download Terraform
+      command: /usr/local/bin/aws s3 cp s3://bluewire-sre-cots/terraform_1.0.6_linux_amd64.zip /tmp/
+
+    - name: Install Terraform
+      unarchive:
+        src: /tmp/terraform_1.0.6_linux_amd64.zip
+        dest: /usr/local/bin
+
+    - name: Download/install kubectl
+      command: /usr/local/bin/aws s3 cp s3://bluewire-sre-cots/kubectl /usr/local/bin/
+
+    - name: enable kubectl
+      file:
+        path: /usr/local/bin/kubectl
+        mode: 0755
+        #    - name: Configure EFS share
